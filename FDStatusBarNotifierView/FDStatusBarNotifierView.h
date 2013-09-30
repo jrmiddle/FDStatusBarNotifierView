@@ -16,7 +16,7 @@ extern NSTimeInterval const kTimeOnScreen;
 
 @property (strong, nonatomic) NSString *message;
 @property (assign, nonatomic) BOOL shouldHideOnTap;
-@property (assign, nonatomic) BOOL manuallyHide; // default: NO
+@property (assign, nonatomic, readonly) BOOL manuallyHide; // derived from timeOnScreen; 0 == YES.
 @property (assign, nonatomic) NSTimeInterval timeOnScreen; // seconds, default: 2s
 @property (readonly, nonatomic) BOOL isHidden;
 
@@ -28,6 +28,15 @@ extern NSTimeInterval const kTimeOnScreen;
 
 - (void)showInWindow:(UIWindow *)window;
 - (void)hide;
+
++ (instancetype)showMessage:(NSString *)message
+                   inWindow:(UIWindow *)window
+                   duration:(NSTimeInterval)duration
+                   delegate:(id<FDStatusBarNotifierViewDelegate>)delegate;
+
++ (instancetype)showMessage:(NSString *)message
+                   inWindow:(UIWindow *)window
+                   delegate:(id<FDStatusBarNotifierViewDelegate>)delegate;
 
 @end
 

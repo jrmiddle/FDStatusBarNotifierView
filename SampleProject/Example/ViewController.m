@@ -39,18 +39,12 @@
 - (IBAction)showMessage
 {
     NSString *text = self.messageField.text;
-    
-    FDStatusBarNotifierView *notifierView = [[FDStatusBarNotifierView alloc] initWithMessage:text delegate:self];
-    notifierView.timeOnScreen = 3.0;
-    [notifierView showInWindow:self.view.window];
+    [FDStatusBarNotifierView showMessage:text inWindow:self.view.window duration:3.0 delegate:self];
 }
 
 - (IBAction)showMessageNoAutohide:(id)sender {
     NSString *text = self.messageField.text;
-    
-    _notifierView = [[FDStatusBarNotifierView alloc] initWithMessage:text delegate:self];
-    _notifierView.manuallyHide = YES;
-    [_notifierView showInWindow:self.view.window];
+    _notifierView = [FDStatusBarNotifierView showMessage:text inWindow:self.view.window duration:0 delegate:self];
 }
 
 - (IBAction)hideButtonTapped:(id)sender {

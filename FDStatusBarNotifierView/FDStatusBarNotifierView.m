@@ -19,6 +19,29 @@ NSTimeInterval const kTimeOnScreen = 2.0;
 
 @implementation FDStatusBarNotifierView
 
+#pragma mark - convenience
+
++ (instancetype)showMessage:(NSString *)message
+                   inWindow:(UIWindow *)window
+                   duration:(NSTimeInterval)duration
+                   delegate:(id<FDStatusBarNotifierViewDelegate>)delegate
+{
+    FDStatusBarNotifierView *ret = [[self alloc] initWithMessage:message delegate:delegate];
+    ret.timeOnScreen = duration;
+    if (window) {
+        [ret showInWindow:window];
+    }
+    return ret;
+}
+
++ (instancetype)showMessage:(NSString *)message
+                   inWindow:(UIWindow *)window
+                   delegate:(id<FDStatusBarNotifierViewDelegate>)delegate
+{
+    return [self showMessage:message inWindow:window duration:kTimeOnScreen delegate:delegate];
+}
+
+
 #pragma mark - Init
 
 - (id)init
@@ -31,7 +54,6 @@ NSTimeInterval const kTimeOnScreen = 2.0;
         
         self.messageLabel = [[UILabel alloc] initWithFrame:CGRectInset([self.class destinationFrameForOrientation:currentOrientation], 10, 0)];
         self.shouldHideOnTap = NO;
-        self.manuallyHide = NO;
         
         [self setupStyle];
         
@@ -107,6 +129,13 @@ NSTimeInterval const kTimeOnScreen = 2.0;
         self.messageLabel.text  = message;
     }
     return self;
+}
+
+#pragma mark - properties
+
+- (BOOL)manuallyHide
+{
+    return self.timeOnScreen == 0;
 }
 
 #pragma mark - Presentation
