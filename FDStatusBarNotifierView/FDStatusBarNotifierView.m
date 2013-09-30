@@ -25,22 +25,67 @@ NSTimeInterval const kTimeOnScreen = 2.0;
 {
     self = [super init];
     if (self) {
-        self.frame = CGRectMake(0, 20, [UIScreen mainScreen].bounds.size.width, 20);
-        self.backgroundColor = [UIColor blackColor];
+        UIInterfaceOrientation currentOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+        self.frame = [self.class originFrameForOrientation:currentOrientation];
+        self.clipsToBounds = YES;
         
-        self.messageLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, ([UIScreen mainScreen].bounds.size.width - 20), 20)];
-        
-        self.messageLabel.textColor = [UIColor whiteColor];
-        self.messageLabel.backgroundColor = [UIColor blackColor];
-        self.messageLabel.textAlignment = NSTextAlignmentCenter;
-        self.messageLabel.font = [UIFont boldSystemFontOfSize:12];
+        self.messageLabel = [[UILabel alloc] initWithFrame:CGRectInset([self.class destinationFrameForOrientation:currentOrientation], 10, 0)];
         self.shouldHideOnTap = NO;
         self.manuallyHide = NO;
-        [self addSubview:self.messageLabel];
         
+        [self setupStyle];
+        
+        [self addSubview:self.messageLabel];
         self.timeOnScreen = kTimeOnScreen;
     }
     return self;
+}
+
+- (void)setupStyle
+{
+    self.messageLabel.textAlignment = NSTextAlignmentCenter;
+    self.messageLabel.font = [UIFont boldSystemFontOfSize:12];
+    self.messageLabel.backgroundColor = [UIColor clearColor];
+    
+    switch ([[UIApplication sharedApplication] statusBarStyle]) {
+
+        case UIStatusBarStyleDefault:
+            if ([self.class on7OrLater]) {
+                self.messageLabel.textColor = [UIColor blackColor];
+                self.backgroundColor = [UIColor clearColor];
+            } else {
+                self.messageLabel.textColor = [UIColor whiteColor];
+                self.backgroundColor = [UIColor blackColor];
+            }
+            break;
+            
+        case UIStatusBarStyleBlackTranslucent:
+            
+            // On 7, essentially lightContent, with an alpha on the background in 6.
+            
+            if ([self.class on7OrLater]) {
+                self.backgroundColor = [UIColor clearColor];
+            } else {
+                self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+            }
+            
+            self.messageLabel.textColor = [UIColor whiteColor];
+            break;
+            
+        case UIStatusBarStyleBlackOpaque: // fall through
+        default:
+            // This isn't UIStatusBarStyleDefault; that has its own case.
+            // This is UIStatusBarStyleLightContent, which is only available
+            // in 7 and above.
+            if ([self.class on7OrLater]) {
+                self.backgroundColor = [UIColor clearColor];
+            } else {
+                self.backgroundColor = [UIColor blackColor];
+            }
+            
+            self.messageLabel.textColor = [UIColor whiteColor];
+            break;
+    }
 }
 
 - (id)initWithMessage:(NSString *)message
@@ -66,6 +111,35 @@ NSTimeInterval const kTimeOnScreen = 2.0;
 
 #pragma mark - Presentation
 
++ (BOOL)on7OrLater
+{
+    static BOOL on7OrLater = NO;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        on7OrLater = [[UIApplication sharedApplication] respondsToSelector:@selector(backgroundRefreshStatus)];
+    });
+    return on7OrLater = YES;
+}
+
++ (CGFloat)widthForOrientation:(UIInterfaceOrientation)orientation
+{
+    if (orientation == UIInterfaceOrientationPortrait) {
+        return [UIScreen mainScreen].bounds.size.width;
+    }
+    return [UIScreen mainScreen].bounds.size.height;
+}
+
++ (CGRect)originFrameForOrientation:(UIInterfaceOrientation)orientation
+{
+    return CGRectMake(0, 20, [self widthForOrientation:orientation], 0);
+}
+
++ (CGRect)destinationFrameForOrientation:(UIInterfaceOrientation)orientation
+{
+    return CGRectMake(0, 0, [self widthForOrientation:orientation], 20);
+    
+}
+
 - (void)showInWindow:(UIWindow *)window
 {
     if (self.delegate && [self.delegate respondsToSelector:@selector(willPresentNotifierView:)]) {
@@ -73,74 +147,62 @@ NSTimeInterval const kTimeOnScreen = 2.0;
     }
     
     [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationSlide];
-    [window insertSubview:self atIndex:0];
-    
+    [window addSubview:self];
+
     CGFloat textWith = [self.message sizeWithFont:self.messageLabel.font
                                 constrainedToSize:CGSizeMake(MAXFLOAT, 20)
                                     lineBreakMode:self.messageLabel.lineBreakMode].width;
     
-    if (textWith < self.frame.size.width) { // the message to display fits in the status bar view
-        
-        CGRect animationDestinationFrame;
-        if ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationPortrait) {
-            animationDestinationFrame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 20);
-        } else {
-            animationDestinationFrame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.height, 20);
-        }
-        
-        [UIView animateWithDuration:.4
-                         animations:^{
-                             self.frame = animationDestinationFrame;
-                         } completion:^(BOOL finished){
-                             
-                             if (self.delegate && [self.delegate respondsToSelector:@selector(didPresentNotifierView:)]) {
-                                 [self.delegate didPresentNotifierView:self];
-                             }
-                             
-                             if (!self.manuallyHide) {
-                                 [NSTimer scheduledTimerWithTimeInterval:self.timeOnScreen
-                                                                  target:self
-                                                                selector:@selector(hide)
-                                                                userInfo:nil
-                                                                 repeats:NO];
-                             }
-
-                         }];
-        
-    } else {
-        if ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationPortrait) {
-            CGRect frame = self.messageLabel.frame;
-            CGFloat exceed = textWith - frame.size.width;
-            frame.size.width = textWith;
-            self.messageLabel.frame = frame;
-            NSTimeInterval timeExceed = exceed / 60;
-            [UIView animateWithDuration:.4 animations:^{
-                self.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, 20);
-            } completion:^(BOOL finished){
-                
-                if (self.delegate && [self.delegate respondsToSelector:@selector(didPresentNotifierView:)])
-                    [self.delegate didPresentNotifierView:self];
-                
-                if (!self.manuallyHide) {
-                    [self performSelector:@selector(hide)
-                               withObject:nil
-                               afterDelay:self.timeOnScreen + timeExceed];
-                    
-                    [self performSelector:@selector(doTextScrollAnimation:)
-                               withObject:[NSNumber numberWithFloat:timeExceed]
-                               afterDelay:self.timeOnScreen / 3];
-                } else {
-                    [self performSelector:@selector(doTextScrollAnimation:)
-                               withObject:[NSNumber numberWithFloat:timeExceed]
-                               afterDelay:kTimeOnScreen / 3];
-                }
-
-                
-            }];
-        } else {
-            // add support for landscape
-        }
+    CGRect animationDestinationFrame = [self.class destinationFrameForOrientation:[[UIApplication sharedApplication] statusBarOrientation]];
+    
+    __block __weak FDStatusBarNotifierView *weakSelf = self;
+    
+    void (^textScrollAnimationBlock)(NSTimeInterval) = ^(NSTimeInterval duration) {};
+    
+    if (textWith > self.frame.size.width) {
+        textScrollAnimationBlock = ^(NSTimeInterval duration) {
+            if (!weakSelf.manuallyHide) {
+                [weakSelf performSelector:@selector(doTextScrollAnimation:)
+                           withObject:[NSNumber numberWithFloat:duration]
+                           afterDelay:weakSelf.timeOnScreen / 3];
+            } else {
+                [weakSelf performSelector:@selector(doTextScrollAnimation:)
+                           withObject:[NSNumber numberWithFloat:duration]
+                           afterDelay:kTimeOnScreen / 3];
+            }
+        };
     }
+    
+    void (^hideBlock)(NSTimeInterval) = ^(NSTimeInterval delay) {
+        if (!weakSelf.manuallyHide) {
+            [weakSelf performSelector:@selector(hide)
+                           withObject:nil
+                           afterDelay:delay];
+        }
+    };
+    
+    CGRect messageFrame = self.messageLabel.frame;
+    CGFloat exceed = textWith - messageFrame.size.width;
+    NSTimeInterval timeExceed = 0;
+    
+    if (exceed > 0) {
+        messageFrame.size.width = textWith;
+        self.messageLabel.frame = messageFrame;
+        timeExceed = exceed / 60;
+    }
+    
+    [UIView animateWithDuration:.4
+                     animations:^{
+                         self.frame = animationDestinationFrame;
+                     }
+                     completion:^(BOOL finished){
+                         
+                         if (self.delegate && [self.delegate respondsToSelector:@selector(didPresentNotifierView:)]) {
+                             [self.delegate didPresentNotifierView:self];
+                         }
+                         hideBlock(weakSelf.timeOnScreen + timeExceed);
+                         textScrollAnimationBlock(timeExceed);
+                     }];
 }
 
 - (void)hide
@@ -153,13 +215,8 @@ NSTimeInterval const kTimeOnScreen = 2.0;
         [self.delegate willHideNotifierView:self];
     }
     
-    CGRect animationDestinationFrame;
-    if ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationPortrait) {
-        animationDestinationFrame = CGRectMake(0, 20, [UIScreen mainScreen].bounds.size.width, 20);
-    } else {
-        animationDestinationFrame = CGRectMake(0, 20, [UIScreen mainScreen].bounds.size.height, 20);
-    }
-    
+    CGRect animationDestinationFrame = [self.class originFrameForOrientation:[[UIApplication sharedApplication] statusBarOrientation]];
+
     [UIView animateWithDuration:.4
                      animations:^{
                          self.frame = animationDestinationFrame;
